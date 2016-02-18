@@ -38,7 +38,7 @@ public class MyDBHandler extends SQLiteOpenHelper {
                 + COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT ," + COLUMN_lat
                 + " REAL," + COLUMN_long + " REAL, " + COLUMN_timestamp + " INTEGER" + ")";
         db.execSQL(CREATE_LOCATIONS_TABLE);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_LOCATIONS);
+        //db.execSQL("DROP TABLE IF EXISTS " + TABLE_LOCATIONS);
     }
 
     @Override
@@ -48,7 +48,7 @@ public class MyDBHandler extends SQLiteOpenHelper {
     }
 
     public void addLocation(MyLocation myLocation) {
-        ArrayList<MyLocation> location1 = findLocations();
+        ArrayList<MyLocation> location1 = findLocations((long) (System.currentTimeMillis() / 1000L));
         ContentValues values = new ContentValues();
         values.put(COLUMN_lat, myLocation.getLat());
         values.put(COLUMN_long, myLocation.getLong());
@@ -56,14 +56,16 @@ public class MyDBHandler extends SQLiteOpenHelper {
         SQLiteDatabase db = this.getWritableDatabase();
         db.insert(TABLE_LOCATIONS, null, values);
         db.close();
-        ArrayList<MyLocation> location = findLocations();
+        ArrayList<MyLocation> location = findLocations((long) (System.currentTimeMillis() / 1000L));
         return;
     }
 
-    public ArrayList<MyLocation> findLocations(){//long timestamp) {
-        String query = "Select * FROM " + TABLE_LOCATIONS;// + " WHERE " + COLUMN_timestamp + " <= " + Long.toString(timestamp);
+    public ArrayList<MyLocation> findLocations(long timestamp) {
+        //String query = "Select * FROM " + TABLE_LOCATIONS + " WHERE " + COLUMN_timestamp + " <= '" + timestamp+"'";//Long.toString(timestamp);
         SQLiteDatabase db = this.getReadableDatabase();
-        Cursor cursor = db.rawQuery(query, null);
+        //Cursor cursor = db.rawQuery(query, null);
+        Cursor cursor = db.query(true,TABLE_LOCATIONS, null, null, null,null,null,COLUMN_timestamp+" ASC",null);
+        //new String[] { COLUMN_timestamp,Long.toString(timestamp) }
         ArrayList<MyLocation> location = new ArrayList<MyLocation>();
 
         cursor.moveToFirst();

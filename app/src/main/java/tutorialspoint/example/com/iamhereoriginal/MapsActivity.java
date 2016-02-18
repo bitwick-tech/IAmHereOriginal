@@ -1,6 +1,7 @@
 package tutorialspoint.example.com.iamhereoriginal;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.location.Location;
@@ -61,6 +62,8 @@ public class MapsActivity extends FragmentActivity implements
     protected void onResume() {
         super.onResume();
         //setUpMapIfNeeded();
+        //startService(new Intent(getBaseContext(), MyService.class));
+
     }
 
     @Override
@@ -69,6 +72,7 @@ public class MapsActivity extends FragmentActivity implements
             LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
             mGoogleApiClient.disconnect();
         }
+        //stopService(new Intent(getBaseContext(), MyService.class));
         super.onPause();
     }
 
