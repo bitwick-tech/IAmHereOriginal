@@ -48,7 +48,7 @@ public class MyDBHandler extends SQLiteOpenHelper {
     }
 
     public void addLocation(MyLocation myLocation) {
-        ArrayList<MyLocation> location1 = findLocations((long) (System.currentTimeMillis() / 1000L));
+        //ArrayList<MyLocation> location1 = findLocations((long) (System.currentTimeMillis() / 1000L));
         ContentValues values = new ContentValues();
         values.put(COLUMN_lat, myLocation.getLat());
         values.put(COLUMN_long, myLocation.getLong());
@@ -56,7 +56,7 @@ public class MyDBHandler extends SQLiteOpenHelper {
         SQLiteDatabase db = this.getWritableDatabase();
         db.insert(TABLE_LOCATIONS, null, values);
         db.close();
-        ArrayList<MyLocation> location = findLocations((long) (System.currentTimeMillis() / 1000L));
+        //ArrayList<MyLocation> location = findLocations((long) (System.currentTimeMillis() / 1000L));
         return;
     }
 
@@ -83,13 +83,15 @@ public class MyDBHandler extends SQLiteOpenHelper {
         return location;
     }
 
-    public int deleteLocations(long timeStamp) {
+    public void deleteLocations(){//long timeStamp) {
 
-        boolean result = false;
+        //boolean result = false;
         SQLiteDatabase db = this.getWritableDatabase();
-        int count = db.delete(TABLE_LOCATIONS, COLUMN_timestamp + " >= ?", new String[]{Long.toString(timeStamp)});
+        //int count = db.delete(TABLE_LOCATIONS, COLUMN_timestamp + " >= ?", new String[]{Long.toString(timeStamp)});
+        db.delete(TABLE_LOCATIONS,null,null);
+        //db.execSQL("delete * from "+ TABLE_LOCATIONS);
         db.close();
-        return count;
+        //return count;
     }
 
     public boolean isTableExists(String tableName) {

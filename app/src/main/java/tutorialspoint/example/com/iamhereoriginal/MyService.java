@@ -1,9 +1,13 @@
 package tutorialspoint.example.com.iamhereoriginal;
 
 import android.Manifest;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.app.Service;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.location.Location;
@@ -13,17 +17,17 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.telephony.TelephonyManager;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.maps.CameraUpdateFactory;
-import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MarkerOptions;
+
+import java.util.Calendar;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by Neeraj on 19/02/16.
@@ -37,6 +41,12 @@ public class MyService extends Service implements
     public static final String TAG = MapsActivity.class.getSimpleName();
     private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
     private LocationRequest mLocationRequest;
+
+//    PendingIntent pi;
+//    BroadcastReceiver br;
+//    AlarmManager am;
+    private AlarmManager alarmMgr;
+    private PendingIntent alarmIntent;
 
     /**
      * Return the communication channel to the service.  May return null if
@@ -104,10 +114,14 @@ public class MyService extends Service implements
         // Create the LocationRequest object
         mLocationRequest = LocationRequest.create()
                 .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
-                .setInterval(1000)        // 1 seconds, in milliseconds
-                .setFastestInterval(1 * 1000); // 1 second, in milliseconds
+                .setInterval(30*1000)        // 30 seconds, in milliseconds
+                .setFastestInterval(5 * 1000); // 5 second, in milliseconds
 
         mGoogleApiClient.connect();
+
+        ScheduledThreadPoolExecutor exec = new ScheduledThreadPoolExecutor(1);
+        long period = 1; // the period between successive executions
+        exec.scheduleAtFixedRate(new MyTask(), 0, period, TimeUnit.DAYS);
 
         return START_STICKY;
     }
@@ -185,11 +199,27 @@ public class MyService extends Service implements
     @Override
     public void onLocationChanged(Location location) {
         handleNewLocation(location);
+        //sendToServer();
     }
 
-    public void sendToServer(){
+    private void sendToServer(){
         MyDBHandler dbHandler = new MyDBHandler(this, null, null, 1);
         ServerInteraction serverInteraction = new ServerInteraction(dbHandler);
         serverInteraction.sendDataToServer(getUniqueIdentifier());
+        //delete data that has been send to the server
+    }
+
+    public void deleteLocations(){
+        MyDBHandler dbHandler = new MyDBHandler(this, null, null, 1);
+        dbHandler.deleteLocations();
+    }
+
+
+    class MyTask implements Runnable {
+        @Override
+        public void run() {
+            sendToServer();
+            deleteLocations();
+        }
     }
 }
