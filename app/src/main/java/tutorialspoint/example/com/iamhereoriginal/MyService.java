@@ -1,14 +1,9 @@
 package tutorialspoint.example.com.iamhereoriginal;
 
 import android.Manifest;
-import android.app.AlarmManager;
-import android.app.PendingIntent;
 import android.app.Service;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
@@ -17,7 +12,6 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.telephony.TelephonyManager;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -25,7 +19,6 @@ import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 
-import java.util.Calendar;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -41,12 +34,16 @@ public class MyService extends Service implements
     public static final String TAG = MapsActivity.class.getSimpleName();
     private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
     private LocationRequest mLocationRequest;
+    public static String email;
 
-//    PendingIntent pi;
-//    BroadcastReceiver br;
-//    AlarmManager am;
-    private AlarmManager alarmMgr;
-    private PendingIntent alarmIntent;
+    private static MyService instance = null;
+
+    double last_lat = 0.0;
+    double last_long = 0.0;
+
+    public static boolean isInstanceCreated() {
+        return instance != null;
+    }
 
     /**
      * Return the communication channel to the service.  May return null if
@@ -76,34 +73,6 @@ public class MyService extends Service implements
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-//        mGoogleApiClient = new GoogleApiClient.Builder(this)
-//                .addConnectionCallbacks(this)
-//                .addOnConnectionFailedListener(this)
-//                .addApi(LocationServices.API)
-//                .build();
-//
-//        // Create the LocationRequest object
-//        mLocationRequest = LocationRequest.create()
-//                .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
-//                .setInterval(10 * 1000)        // 10 seconds, in milliseconds
-//                .setFastestInterval(1 * 1000); // 1 second, in milliseconds
-//
-//        mGoogleApiClient.connect();
-        //sheduling sending location data to server daily
-//        ScheduledExecutorService scheduler =
-//                Executors.newSingleThreadScheduledExecutor();
-//
-//        scheduler.scheduleAtFixedRate
-//                (new Runnable() {
-//                    public void run() {
-//                        String ret = sendDataToServer();
-//                        if(ret != null){
-//                            dbHandler.deleteLocations((long) (System.currentTimeMillis() / 1000L));
-//                        }
-//
-//                    }
-//                }, 0, 200, TimeUnit.SECONDS);
-        // Let it continue running until it is stopped.
 
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
@@ -114,14 +83,16 @@ public class MyService extends Service implements
         // Create the LocationRequest object
         mLocationRequest = LocationRequest.create()
                 .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
-                .setInterval(30*1000)        // 30 seconds, in milliseconds
-                .setFastestInterval(5 * 1000); // 5 second, in milliseconds
+                .setInterval(10*1000)        // 30 seconds, in milliseconds
+                .setFastestInterval(3 * 1000); // 3 seconds, in milliseconds
 
         mGoogleApiClient.connect();
 
         ScheduledThreadPoolExecutor exec = new ScheduledThreadPoolExecutor(1);
-        long period = 1; // the period between successive executions
-        exec.scheduleAtFixedRate(new MyTask(), 0, period, TimeUnit.DAYS);
+        long period = 24*60; // the period between successive executions
+        exec.scheduleAtFixedRate(new MyTask(), 0, period, TimeUnit.MINUTES);
+
+        instance = this;
 
         return START_STICKY;
     }
@@ -131,6 +102,11 @@ public class MyService extends Service implements
         return telephonyManager.getDeviceId();
     }
 
+    @Override
+    public void onDestroy()
+    {
+        instance = null;
+    }
     @Override
     public void onConnected(Bundle bundle) {
         Log.i(TAG, "Location services connected.");
@@ -190,23 +166,25 @@ public class MyService extends Service implements
         double currentLatitude = location.getLatitude();
         double currentLongitude = location.getLongitude();
         long lastUpdateTime = location.getTime();
-
-        MyDBHandler dbHandler = new MyDBHandler(this, null, null, 1);
-        MyLocation myLocation = new MyLocation(lastUpdateTime, currentLatitude, currentLongitude);
-        dbHandler.addLocation(myLocation);
+        //if difference between current location and previous location is greater than 50m, o
+        if(Double.compare(getDistance(last_lat, currentLatitude, last_long, currentLongitude, 0.0, 0.0), 50.0) >= 0) {
+            MyDBHandler dbHandler = new MyDBHandler(this, null, null, 1);
+            MyLocation myLocation = new MyLocation(lastUpdateTime, currentLatitude, currentLongitude);
+            dbHandler.addLocation(myLocation);
+        }
+        last_lat = currentLatitude;
+        last_long = currentLongitude;
     }
 
     @Override
     public void onLocationChanged(Location location) {
         handleNewLocation(location);
-        //sendToServer();
     }
 
     private void sendToServer(){
         MyDBHandler dbHandler = new MyDBHandler(this, null, null, 1);
         ServerInteraction serverInteraction = new ServerInteraction(dbHandler);
         serverInteraction.sendDataToServer(getUniqueIdentifier());
-        //delete data that has been send to the server
     }
 
     public void deleteLocations(){
@@ -214,12 +192,34 @@ public class MyService extends Service implements
         dbHandler.deleteLocations();
     }
 
-
     class MyTask implements Runnable {
         @Override
         public void run() {
+            mLocationRequest.setFastestInterval(50000);
             sendToServer();
+            //delete data that has been send to the server
             deleteLocations();
+            mLocationRequest.setFastestInterval(3000);
         }
+    }
+
+    public static double getDistance(double lat1, double lat2, double lon1,
+                                  double lon2, double el1, double el2) {
+
+        final int R = 6371; // Radius of the earth
+
+        Double latDistance = Math.toRadians(lat2 - lat1);
+        Double lonDistance = Math.toRadians(lon2 - lon1);
+        Double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        Double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        double distance = R * c * 1000; // convert to meters
+
+        double heightt = el1 - el2;
+
+        distance = Math.pow(distance, 2) + Math.pow(heightt, 2);
+
+        return Math.sqrt(distance);
     }
 }

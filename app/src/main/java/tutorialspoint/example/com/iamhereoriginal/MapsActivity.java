@@ -1,9 +1,12 @@
 package tutorialspoint.example.com.iamhereoriginal;
 
 import android.Manifest;
+import android.accounts.AccountManager;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.support.v4.app.ActivityCompat;
@@ -12,6 +15,8 @@ import android.os.Bundle;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
+import com.google.android.gms.auth.GoogleAuthUtil;
+import com.google.android.gms.common.AccountPicker;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationListener;
@@ -30,10 +35,7 @@ public class MapsActivity extends FragmentActivity implements
         OnMapReadyCallback {
 
     private GoogleMap mMap;
-    private GoogleApiClient mGoogleApiClient;
-    public static final String TAG = MapsActivity.class.getSimpleName();
-    private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
-    private LocationRequest mLocationRequest;
+    private static final int REQUEST_CODE_EMAIL = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,20 +45,43 @@ public class MapsActivity extends FragmentActivity implements
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
-        startService(new Intent(getBaseContext(), MyService.class));
 
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQUEST_CODE_EMAIL && resultCode == RESULT_OK) {
+            String accountName = data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME);
+            saveEmail(accountName);
+            MyService.email = accountName;
+        }
     }
 
     @Override
     protected void onResume() {
+        //if service is already there, no need to create a new service
+        if(!MyService.isInstanceCreated()) {
+            startService(new Intent(getBaseContext(), MyService.class));
+             String email = loadEmail();
+            if(email == null || email.isEmpty()){
+                try {
+                    Intent intent = AccountPicker.newChooseAccountIntent(null, null,
+                            new String[]{GoogleAuthUtil.GOOGLE_ACCOUNT_TYPE}, false, null, null, null, null);
+                    startActivityForResult(intent, REQUEST_CODE_EMAIL);
+                } catch (ActivityNotFoundException e) {
+                    // TODO
+                }
+            }
+            else{
+                MyService.email = email;
+            }
+        }
+
         super.onResume();
-        //setUpMapIfNeeded();
-        //startService(new Intent(getBaseContext(), MyService.class));
     }
 
     @Override
     protected void onPause() {
-
         //stopService(new Intent(getBaseContext(), MyService.class));
         super.onPause();
     }
@@ -81,14 +106,20 @@ public class MapsActivity extends FragmentActivity implements
         mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
     }
 
-    private void sendToServer(){
-        MyDBHandler dbHandler = new MyDBHandler(this, null, null, 1);
-        ServerInteraction serverInteraction = new ServerInteraction(dbHandler);
-        serverInteraction.sendDataToServer(getUniqueIdentifier());
-        //delete data that has been send to the server
+    private void saveEmail(String email) {
+        SharedPreferences sp =
+                getSharedPreferences("MyPrefs",
+                        Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sp.edit();
+        editor.putString("email", email);
+        editor.commit();
     }
-    public String getUniqueIdentifier() {
-        TelephonyManager telephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
-        return telephonyManager.getDeviceId();
+
+    private String loadEmail() {
+        SharedPreferences sp =
+                getSharedPreferences("MyPrefs",
+                        Context.MODE_PRIVATE);
+        String email = sp.getString("email", null);
+        return email;
     }
 }

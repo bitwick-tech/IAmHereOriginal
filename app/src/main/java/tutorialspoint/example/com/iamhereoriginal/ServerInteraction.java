@@ -17,7 +17,15 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
+import java.util.Locale;
+import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by Neeraj on 18/02/16.
@@ -44,7 +52,19 @@ public class ServerInteraction {
         }
         return null;
     }
-
+    public String getTimeZone(){
+//        Calendar mCalendar = new GregorianCalendar();
+//        TimeZone mTimeZone = mCalendar.getTimeZone();
+//        int mGMTOffset = mTimeZone.getRawOffset();
+//        long ret = TimeUnit.HOURS.convert(mGMTOffset, TimeUnit.MILLISECONDS);
+//        return String.valueOf(ret);
+        Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("GMT"),
+                Locale.getDefault());
+        Date currentLocalTime = calendar.getTime();
+        DateFormat date = new SimpleDateFormat("Z");
+        String localTime = date.format(currentLocalTime);
+        return localTime;
+    }
     private JSONObject formatJsonFromList(ArrayList<MyLocation> locationList) {
         int size = locationList.size();
         if(size > 0) {
@@ -53,6 +73,7 @@ public class ServerInteraction {
             JSONArray _timestamp = new JSONArray();
             JSONArray _lat = new JSONArray();
             JSONArray _long = new JSONArray();
+            String timeZone = getTimeZone();
             for (int i = 0; i < size; i++) {
                 tmp = locationList.get(i);
                 _timestamp.put(Long.toString(tmp.getTimestamp()));
@@ -65,66 +86,17 @@ public class ServerInteraction {
                 resp.put("latitude", _lat);
                 resp.put("longitude", _long);
                 resp.put("deviceId", deviceId);
+                if(!timeZone.isEmpty()){
+                    resp.put("tz",timeZone);
+                }
+                String myEmail = MyService.email;
+                if(!myEmail.isEmpty()){
+                    resp.put("email",myEmail);
+                }
             } catch (JSONException e) {
                 e.printStackTrace();
             }
             return resp;
-        }
-        return null;
-    }
-
-    private String SendJsonDataToServerFunction(String JsonDATA){
-        String JsonResponse = null;
-        HttpURLConnection urlConnection = null;
-        BufferedReader reader = null;
-        try {
-            URL url = new URL("http://ec2-52-29-17-146.eu-central-1.compute.amazonaws.com:8000/ping");
-            urlConnection = (HttpURLConnection) url.openConnection();
-            urlConnection.setDoOutput(true);
-            // is output buffer writer
-            urlConnection.setRequestMethod("POST");
-            urlConnection.setRequestProperty("Content-Type", "application/json");
-            urlConnection.setRequestProperty("Accept", "application/json");
-            //set headers and method
-            Writer writer = new BufferedWriter(new OutputStreamWriter(urlConnection.getOutputStream(), "UTF-8"));
-            writer.write(JsonDATA);
-            // json data
-            writer.close();
-            InputStream inputStream = urlConnection.getInputStream();
-            //input stream
-            StringBuilder buffer = new StringBuilder();
-            if (inputStream == null) {
-                // Nothing to do.
-                return null;
-            }
-            reader = new BufferedReader(new InputStreamReader(inputStream));
-
-            String inputLine;
-            while ((inputLine = reader.readLine()) != null)
-                buffer.append(inputLine).append("\n");
-            if (buffer.length() == 0) {
-                // Stream was empty. No point in parsing.
-                return null;
-            }
-            JsonResponse = buffer.toString();
-            //response data
-            //send to post execute
-            return JsonResponse;
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        finally {
-            if (urlConnection != null) {
-                urlConnection.disconnect();
-            }
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (final IOException e) {
-                    e.printStackTrace();
-                }
-            }
         }
         return null;
     }
@@ -194,6 +166,4 @@ public class ServerInteraction {
         }
 
     }
-
-
 }
