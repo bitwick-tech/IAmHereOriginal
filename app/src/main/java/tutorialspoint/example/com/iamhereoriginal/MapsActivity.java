@@ -1,17 +1,25 @@
 package tutorialspoint.example.com.iamhereoriginal;
 
 import android.Manifest;
+import android.accounts.AccountManager;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.os.SystemClock;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
+import com.google.android.gms.auth.GoogleAuthUtil;
+import com.google.android.gms.common.AccountPicker;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationListener;
@@ -25,15 +33,13 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 
 public class MapsActivity extends FragmentActivity implements
         OnMapReadyCallback {
 
     private GoogleMap mMap;
-    private GoogleApiClient mGoogleApiClient;
-    public static final String TAG = MapsActivity.class.getSimpleName();
-    private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
-    private LocationRequest mLocationRequest;
+    private static final int REQUEST_CODE_EMAIL = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,20 +49,76 @@ public class MapsActivity extends FragmentActivity implements
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
-        startService(new Intent(getBaseContext(), MyService.class));
+        scheduleAlarm();
+    }
+    // Setup a recurring alarm every half hour
+    public void scheduleAlarm() {
+        // Construct an intent that will execute the AlarmReceiver
+        Intent intent = new Intent(getApplicationContext(), MyAlarmReceiver.class);
+        // Create a PendingIntent to be triggered when the alarm goes off
+        final PendingIntent pIntent = PendingIntent.getBroadcast(this, MyAlarmReceiver.REQUEST_CODE,
+                intent, PendingIntent.FLAG_UPDATE_CURRENT);
+        // Setup periodic alarm every 5 seconds
+        long firstMillis = System.currentTimeMillis();
 
+        // Set the alarm to start at 8:30 a.m.
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(System.currentTimeMillis());
+        calendar.set(Calendar.HOUR_OF_DAY, 8);
+        calendar.set(Calendar.MINUTE, 30);
+
+
+        // alarm is set right away
+        AlarmManager alarm = (AlarmManager) this.getSystemService(Context.ALARM_SERVICE);
+        // First parameter is the type: ELAPSED_REALTIME, ELAPSED_REALTIME_WAKEUP, RTC_WAKEUP
+        // Interval can be INTERVAL_FIFTEEN_MINUTES, INTERVAL_HALF_HOUR, INTERVAL_HOUR, INTERVAL_DAY
+//        alarm.setInexactRepeating(AlarmManager.RTC_WAKEUP, firstMillis,
+//                AlarmManager.INTERVAL_HALF_HOUR, pIntent);
+        alarm.setRepeating(AlarmManager.RTC_WAKEUP, firstMillis,//calendar.getTimeInMillis(),
+                1000 * 60 * 1, pIntent);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQUEST_CODE_EMAIL && resultCode == RESULT_OK) {
+            String accountName = data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME);
+            if(accountName == null || accountName.isEmpty()) {
+                return;
+            }
+            saveEmail(accountName);
+            MyService.email = accountName;
+        }
     }
 
     @Override
     protected void onResume() {
+        //if service is already there, no need to create a new service
+        if(!MyService.isInstanceCreated()) {
+
+            String email = loadEmail();
+            if(email == null || email.isEmpty()){
+                try {
+                    Intent intent = AccountPicker.newChooseAccountIntent(null, null,
+                            new String[]{GoogleAuthUtil.GOOGLE_ACCOUNT_TYPE}, false, null, null, null, null);
+                    startActivityForResult(intent, REQUEST_CODE_EMAIL);
+                } catch (ActivityNotFoundException e) {
+                    // TODO
+                }
+            }
+            else{
+                MyService.email = email;
+            }
+            email = loadEmail();
+            if(email != null && !email.isEmpty()) {
+                startService(new Intent(getBaseContext(), MyService.class));
+            }
+        }
+
         super.onResume();
-        //setUpMapIfNeeded();
-        //startService(new Intent(getBaseContext(), MyService.class));
     }
 
     @Override
     protected void onPause() {
-
         //stopService(new Intent(getBaseContext(), MyService.class));
         super.onPause();
     }
@@ -81,14 +143,21 @@ public class MapsActivity extends FragmentActivity implements
         mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
     }
 
-    private void sendToServer(){
-        MyDBHandler dbHandler = new MyDBHandler(this, null, null, 1);
-        ServerInteraction serverInteraction = new ServerInteraction(dbHandler);
-        serverInteraction.sendDataToServer(getUniqueIdentifier());
-        //delete data that has been send to the server
+    private void saveEmail(String email) {
+        SharedPreferences sp =
+                getSharedPreferences("MyPrefs",
+                        Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sp.edit();
+        editor.clear();
+        editor.putString("email", email);
+        editor.commit();
     }
-    public String getUniqueIdentifier() {
-        TelephonyManager telephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
-        return telephonyManager.getDeviceId();
+
+    private String loadEmail() {
+        SharedPreferences sp =
+                getSharedPreferences("MyPrefs",
+                        Context.MODE_PRIVATE);
+        String email = sp.getString("email", null);
+        return email;
     }
 }

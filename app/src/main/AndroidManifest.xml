@@ -45,13 +45,14 @@
         </activity>
 
         <service android:name=".MyService" />
-        <receiver android:name=".AlarmReciever"/>
-        <receiver android:name=".SampleBootReceiver"
-            android:enabled="false">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED"></action>
-            </intent-filter>
+        <receiver
+            android:name=".MyAlarmReceiver"
+            android:process=":remote" >
         </receiver>
+
+        <service
+            android:name=".MyPeriodicService"
+            android:exported="false" />
     </application>
 
 </manifest>

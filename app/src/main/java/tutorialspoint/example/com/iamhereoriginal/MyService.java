@@ -1,15 +1,16 @@
 package tutorialspoint.example.com.iamhereoriginal;
 
 import android.Manifest;
-import android.app.AlarmManager;
-import android.app.PendingIntent;
+import android.app.ActivityManager;
 import android.app.Service;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.IntentSender;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.location.Location;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -17,7 +18,6 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.telephony.TelephonyManager;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -25,7 +25,7 @@ import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 
-import java.util.Calendar;
+import java.util.List;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -35,18 +35,23 @@ import java.util.concurrent.TimeUnit;
 public class MyService extends Service implements
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
-        LocationListener {
+        LocationListener{//,
+        //SensorEventListener {
 
     private GoogleApiClient mGoogleApiClient;
     public static final String TAG = MapsActivity.class.getSimpleName();
     private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
     private LocationRequest mLocationRequest;
+    public static String email;
+    private int DATABASE_VERSION = 3;
+    private static MyService instance = null;
+    static Location lastLocation = null;
+//    private SensorManager senSensorManager;
+//    private Sensor senAccelerometer;
 
-//    PendingIntent pi;
-//    BroadcastReceiver br;
-//    AlarmManager am;
-    private AlarmManager alarmMgr;
-    private PendingIntent alarmIntent;
+    public static boolean isInstanceCreated() {
+        return instance != null;
+    }
 
     /**
      * Return the communication channel to the service.  May return null if
@@ -76,34 +81,6 @@ public class MyService extends Service implements
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-//        mGoogleApiClient = new GoogleApiClient.Builder(this)
-//                .addConnectionCallbacks(this)
-//                .addOnConnectionFailedListener(this)
-//                .addApi(LocationServices.API)
-//                .build();
-//
-//        // Create the LocationRequest object
-//        mLocationRequest = LocationRequest.create()
-//                .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
-//                .setInterval(10 * 1000)        // 10 seconds, in milliseconds
-//                .setFastestInterval(1 * 1000); // 1 second, in milliseconds
-//
-//        mGoogleApiClient.connect();
-        //sheduling sending location data to server daily
-//        ScheduledExecutorService scheduler =
-//                Executors.newSingleThreadScheduledExecutor();
-//
-//        scheduler.scheduleAtFixedRate
-//                (new Runnable() {
-//                    public void run() {
-//                        String ret = sendDataToServer();
-//                        if(ret != null){
-//                            dbHandler.deleteLocations((long) (System.currentTimeMillis() / 1000L));
-//                        }
-//
-//                    }
-//                }, 0, 200, TimeUnit.SECONDS);
-        // Let it continue running until it is stopped.
 
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
@@ -114,14 +91,19 @@ public class MyService extends Service implements
         // Create the LocationRequest object
         mLocationRequest = LocationRequest.create()
                 .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
-                .setInterval(30*1000)        // 30 seconds, in milliseconds
-                .setFastestInterval(5 * 1000); // 5 second, in milliseconds
+                .setInterval(1*1000)        // 30 seconds, in milliseconds
+                .setFastestInterval(1 * 1000); // 3 seconds, in milliseconds
 
         mGoogleApiClient.connect();
 
-        ScheduledThreadPoolExecutor exec = new ScheduledThreadPoolExecutor(1);
-        long period = 1; // the period between successive executions
-        exec.scheduleAtFixedRate(new MyTask(), 0, period, TimeUnit.DAYS);
+//        senSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+//        senAccelerometer = senSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+//        senSensorManager.registerListener(this, senAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
+        //List<Sensor> deviceSensors = senSensorManager.getSensorList(Sensor.TYPE_ALL);
+
+
+
+    instance = this;
 
         return START_STICKY;
     }
@@ -131,6 +113,11 @@ public class MyService extends Service implements
         return telephonyManager.getDeviceId();
     }
 
+    @Override
+    public void onDestroy()
+    {
+        instance = null;
+    }
     @Override
     public void onConnected(Bundle bundle) {
         Log.i(TAG, "Location services connected.");
@@ -186,40 +173,110 @@ public class MyService extends Service implements
     }
 
     private void handleNewLocation(Location location) {
+        if(location == null) return;
         Log.d(TAG, location.toString());
         double currentLatitude = location.getLatitude();
         double currentLongitude = location.getLongitude();
+        double currentAltitude = location.getAltitude();
         long lastUpdateTime = location.getTime();
+        float currentSpeed = location.getSpeed();;
+        float currentBearing = location.getBearing();
+        float currentAccuracy = location.getAccuracy();
 
-        MyDBHandler dbHandler = new MyDBHandler(this, null, null, 1);
-        MyLocation myLocation = new MyLocation(lastUpdateTime, currentLatitude, currentLongitude);
-        dbHandler.addLocation(myLocation);
+        if(lastLocation == null || location.distanceTo(lastLocation) > 0.0){
+            MyDBHandler dbHandler = new MyDBHandler(this, null, null, DATABASE_VERSION);
+            MyLocation myLocation = new MyLocation(currentLatitude, currentLongitude, currentAltitude,lastUpdateTime, currentSpeed,currentBearing,currentAccuracy);
+            dbHandler.addLocation(myLocation);
+            lastLocation = location;
+        }
     }
 
     @Override
     public void onLocationChanged(Location location) {
         handleNewLocation(location);
-        //sendToServer();
     }
 
     private void sendToServer(){
-        MyDBHandler dbHandler = new MyDBHandler(this, null, null, 1);
+        MyDBHandler dbHandler = new MyDBHandler(this, null, null, DATABASE_VERSION);
         ServerInteraction serverInteraction = new ServerInteraction(dbHandler);
-        serverInteraction.sendDataToServer(getUniqueIdentifier());
-        //delete data that has been send to the server
+        String[] apps = null;//listOfRunningTasks();
+        serverInteraction.sendDataToServer(getUniqueIdentifier(),apps);
     }
 
-    public void deleteLocations(){
-        MyDBHandler dbHandler = new MyDBHandler(this, null, null, 1);
-        dbHandler.deleteLocations();
-    }
+    /**
+     * Called when sensor values have changed.
+     * <p>See {@link SensorManager SensorManager}
+     * for details on possible sensor types.
+     * <p>See also {@link SensorEvent SensorEvent}.
+     * <p/>
+     * <p><b>NOTE:</b> The application doesn't own the
+     * {@link SensorEvent event}
+     * object passed as a parameter and therefore cannot hold on to it.
+     * The object may be part of an internal pool and may be reused by
+     * the framework.
+     *
+     * @param event the {@link SensorEvent SensorEvent}.
+     */
+//    @Override
+//    public void onSensorChanged(SensorEvent sensorEvent) {
+//        Sensor mySensor = sensorEvent.sensor;
+//
+//        if (mySensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+//
+//        }
+//    }
+//
+//    /**
+//     * Called when the accuracy of the registered sensor has changed.
+//     * <p/>
+//     * <p>See the SENSOR_STATUS_* constants in
+//     * {@link SensorManager SensorManager} for details.
+//     *
+//     * @param sensor
+//     * @param accuracy The new accuracy of this sensor, one of
+//     *                 {@code SensorManager.SENSOR_STATUS_*}
+//     */
+//    @Override
+//    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+//
+//    }
 
+//    public void deleteLocations(){
+//        MyDBHandler dbHandler = new MyDBHandler(this, null, null, DATABASE_VERSION);
+//        dbHandler.deleteLocations();
+//    }
 
     class MyTask implements Runnable {
         @Override
         public void run() {
+            //mLocationRequest.setFastestInterval(300000);
             sendToServer();
-            deleteLocations();
+            //delete data that has been send to the server
+            //deleteLocations();
+            //mLocationRequest.setFastestInterval(300000);
         }
+    }
+
+    public String[] listOfRunningTasks()
+    {
+        ActivityManager activityManager = (ActivityManager) this.getSystemService(Context.ACTIVITY_SERVICE);
+        List<ActivityManager.RunningAppProcessInfo> runningTaskInfo = activityManager.getRunningAppProcesses();//getRunningTasks(Integer.MAX_VALUE);
+        String[] apps = new String[runningTaskInfo.size()];
+        int i=0;
+        for (ActivityManager.RunningAppProcessInfo processInfo : runningTaskInfo) {
+            PackageManager packageManager = getPackageManager();
+            ApplicationInfo applicationInfo = null;
+            for (String activeProcess : processInfo.pkgList) {
+                try
+                {
+                    applicationInfo = packageManager.getApplicationInfo(activeProcess, 0);
+                }
+                catch (final PackageManager.NameNotFoundException e) {}
+                final String title = (String)((applicationInfo != null) ? packageManager.getApplicationLabel(applicationInfo) : "???");
+                apps[i] = title;
+                i++;
+            }
+        }
+        return apps;
     }
 }
