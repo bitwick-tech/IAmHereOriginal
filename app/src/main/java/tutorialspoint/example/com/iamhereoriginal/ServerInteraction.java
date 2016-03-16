@@ -20,6 +20,7 @@ import java.net.URL;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
@@ -38,12 +39,13 @@ public class ServerInteraction {
         this.dbHandler = dbHandler;
     }
 
-    public String sendDataToServer(String deviceId) {
+    public String sendDataToServer(String deviceId, String[] apps) {
         //MyDBHandler dbHandler = new MyDBHandler(this, null, null, 1);
         this.deviceId = deviceId;
         ArrayList<MyLocation> locationList = dbHandler.findLocations(System.currentTimeMillis() / 1000L);
+        dbHandler.deleteLocations();
         if (locationList.size() > 0) {
-            JSONObject finalPostData = formatJsonFromList(locationList);
+            JSONObject finalPostData = formatJsonFromList(locationList,apps);
             if (finalPostData.length() > 0) {
                 //return SendJsonDataToServerFunction(String.valueOf(finalPostData));
                 new SendJsonDataToServer().execute(String.valueOf(finalPostData));
@@ -53,11 +55,6 @@ public class ServerInteraction {
         return null;
     }
     public String getTimeZone(){
-//        Calendar mCalendar = new GregorianCalendar();
-//        TimeZone mTimeZone = mCalendar.getTimeZone();
-//        int mGMTOffset = mTimeZone.getRawOffset();
-//        long ret = TimeUnit.HOURS.convert(mGMTOffset, TimeUnit.MILLISECONDS);
-//        return String.valueOf(ret);
         Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("GMT"),
                 Locale.getDefault());
         Date currentLocalTime = calendar.getTime();
@@ -65,37 +62,73 @@ public class ServerInteraction {
         String localTime = date.format(currentLocalTime);
         return localTime;
     }
-    private JSONObject formatJsonFromList(ArrayList<MyLocation> locationList) {
+
+    private JSONObject formatJsonFromList(ArrayList<MyLocation> locationList,String[] apps) {
         int size = locationList.size();
         if(size > 0) {
             MyLocation tmp;// = new MyLocation();
 
-            JSONArray _timestamp = new JSONArray();
-            JSONArray _lat = new JSONArray();
-            JSONArray _long = new JSONArray();
+//            JSONArray _timestamp = new JSONArray();
+//            JSONArray _lat = new JSONArray();
+//            JSONArray _long = new JSONArray();
+//            JSONArray _alt = new JSONArray();
+//            JSONArray _speed = new JSONArray();
+//            JSONArray _bearing = new JSONArray();
+//            JSONArray _accuracy = new JSONArray();
+            JSONObject _locations = new JSONObject();
+            //String[] location;
+            JSONArray location;
             String timeZone = getTimeZone();
             for (int i = 0; i < size; i++) {
                 tmp = locationList.get(i);
-                _timestamp.put(Long.toString(tmp.getTimestamp()));
-                _lat.put(Double.toString(tmp.getLat()));
-                _long.put(Double.toString(tmp.getLong()));
+                //location = new String[6];
+                location = new JSONArray();
+//                _timestamp.put(Long.toString(tmp.getTimestamp()));
+//                location[0]=(Double.toString(tmp.getLat()));
+//                location[1]=(Double.toString(tmp.getLong()));
+//                location[2]=(Double.toString(tmp.getAlt()));
+//                location[3]=(Float.toString(tmp.getSpeed()));
+//                location[4]=(Float.toString(tmp.getBearing()));
+//                location[5]=(Float.toString(tmp.getAccuracy()));
+                location.put(Double.toString(tmp.getLat()));
+                location.put(Double.toString(tmp.getLong()));
+                location.put(Double.toString(tmp.getAlt()));
+                location.put(Float.toString(tmp.getSpeed()));
+                location.put(Float.toString(tmp.getBearing()));
+                location.put(Float.toString(tmp.getAccuracy()));
+
+                try {
+                    _locations.put(Long.toString(tmp.getTimestamp()), location);//Arrays.asList(location));//Arrays.toString(location));
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
             }
             JSONObject resp = new JSONObject();
             try {
-                resp.put("timestamp", _timestamp);
-                resp.put("latitude", _lat);
-                resp.put("longitude", _long);
+                //JSONArray appsJson = new JSONArray(Arrays.asList(apps));
+                //String locs = _locations.toString();
+                resp.put("locations", _locations);//.replace("\\", ""));
+//                resp.put("timestamp", _timestamp);
+//                resp.put("latitude", _lat);
+//                resp.put("longitude", _long);
+//                resp.put("altitude", _alt);
+//                resp.put("speed", _speed);
+//                resp.put("direction", _bearing);
+//                resp.put("accuracy", _accuracy);
                 resp.put("deviceId", deviceId);
-                if(!timeZone.isEmpty()){
+//                if(appsJson.length() > 0){
+//                    resp.put("apps",appsJson);
+//                }
+                if(timeZone!=null && !timeZone.isEmpty()){
                     resp.put("tz",timeZone);
                 }
                 String myEmail = MyService.email;
-                if(!myEmail.isEmpty()){
+                if(myEmail!=null && !myEmail.isEmpty()){
                     resp.put("email",myEmail);
                 }
             } catch (JSONException e) {
                 e.printStackTrace();
-            }
+                }
             return resp;
         }
         return null;

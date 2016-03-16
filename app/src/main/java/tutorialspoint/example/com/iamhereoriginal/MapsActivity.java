@@ -2,6 +2,8 @@ package tutorialspoint.example.com.iamhereoriginal;
 
 import android.Manifest;
 import android.accounts.AccountManager;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
@@ -9,6 +11,7 @@ import android.content.IntentSender;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.os.SystemClock;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
@@ -30,6 +33,7 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 
 public class MapsActivity extends FragmentActivity implements
         OnMapReadyCallback {
@@ -45,13 +49,42 @@ public class MapsActivity extends FragmentActivity implements
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+        scheduleAlarm();
+    }
+    // Setup a recurring alarm every half hour
+    public void scheduleAlarm() {
+        // Construct an intent that will execute the AlarmReceiver
+        Intent intent = new Intent(getApplicationContext(), MyAlarmReceiver.class);
+        // Create a PendingIntent to be triggered when the alarm goes off
+        final PendingIntent pIntent = PendingIntent.getBroadcast(this, MyAlarmReceiver.REQUEST_CODE,
+                intent, PendingIntent.FLAG_UPDATE_CURRENT);
+        // Setup periodic alarm every 5 seconds
+        long firstMillis = System.currentTimeMillis();
 
+        // Set the alarm to start at 8:30 a.m.
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(System.currentTimeMillis());
+        calendar.set(Calendar.HOUR_OF_DAY, 8);
+        calendar.set(Calendar.MINUTE, 30);
+
+
+        // alarm is set right away
+        AlarmManager alarm = (AlarmManager) this.getSystemService(Context.ALARM_SERVICE);
+        // First parameter is the type: ELAPSED_REALTIME, ELAPSED_REALTIME_WAKEUP, RTC_WAKEUP
+        // Interval can be INTERVAL_FIFTEEN_MINUTES, INTERVAL_HALF_HOUR, INTERVAL_HOUR, INTERVAL_DAY
+//        alarm.setInexactRepeating(AlarmManager.RTC_WAKEUP, firstMillis,
+//                AlarmManager.INTERVAL_HALF_HOUR, pIntent);
+        alarm.setRepeating(AlarmManager.RTC_WAKEUP, firstMillis,//calendar.getTimeInMillis(),
+                1000 * 60 * 1, pIntent);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == REQUEST_CODE_EMAIL && resultCode == RESULT_OK) {
             String accountName = data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME);
+            if(accountName == null || accountName.isEmpty()) {
+                return;
+            }
             saveEmail(accountName);
             MyService.email = accountName;
         }
@@ -61,8 +94,8 @@ public class MapsActivity extends FragmentActivity implements
     protected void onResume() {
         //if service is already there, no need to create a new service
         if(!MyService.isInstanceCreated()) {
-            startService(new Intent(getBaseContext(), MyService.class));
-             String email = loadEmail();
+
+            String email = loadEmail();
             if(email == null || email.isEmpty()){
                 try {
                     Intent intent = AccountPicker.newChooseAccountIntent(null, null,
@@ -74,6 +107,10 @@ public class MapsActivity extends FragmentActivity implements
             }
             else{
                 MyService.email = email;
+            }
+            email = loadEmail();
+            if(email != null && !email.isEmpty()) {
+                startService(new Intent(getBaseContext(), MyService.class));
             }
         }
 
@@ -111,6 +148,7 @@ public class MapsActivity extends FragmentActivity implements
                 getSharedPreferences("MyPrefs",
                         Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sp.edit();
+        editor.clear();
         editor.putString("email", email);
         editor.commit();
     }
