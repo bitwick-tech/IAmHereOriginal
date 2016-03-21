@@ -49,7 +49,7 @@ public class MapsActivity extends FragmentActivity implements
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
-        scheduleAlarm();
+
     }
     // Setup a recurring alarm every half hour
     public void scheduleAlarm() {
@@ -86,6 +86,8 @@ public class MapsActivity extends FragmentActivity implements
                 return;
             }
             saveEmail(accountName);
+            startService(new Intent(getBaseContext(), MyService.class));
+            scheduleAlarm();
             //MyService.email = accountName;
         }
     }
@@ -104,13 +106,6 @@ public class MapsActivity extends FragmentActivity implements
                 } catch (ActivityNotFoundException e) {
                     // TODO
                 }
-            }
-//            else{
-//                MyService.email = email;
-//            }
-            email = loadEmail();
-            if(email != null && !email.isEmpty()) {
-                startService(new Intent(getBaseContext(), MyService.class));
             }
         }
 
