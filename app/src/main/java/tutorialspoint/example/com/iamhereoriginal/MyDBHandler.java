@@ -16,7 +16,7 @@ import java.util.ArrayList;
  */
 public class MyDBHandler extends SQLiteOpenHelper {
 
-
+    private static int DATABASE_VERSION = 3;
     private static final String DATABASE_NAME = "locationDB.db";
     private static final String TABLE_LOCATIONS = "locations";
 
@@ -31,7 +31,7 @@ public class MyDBHandler extends SQLiteOpenHelper {
 
     public MyDBHandler(Context context, String name,
                        SQLiteDatabase.CursorFactory factory, int version) {
-        super(context, DATABASE_NAME, factory, version);
+        super(context, DATABASE_NAME, factory, DATABASE_VERSION);
     }
 
     @Override

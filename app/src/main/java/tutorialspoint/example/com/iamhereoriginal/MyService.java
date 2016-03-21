@@ -196,14 +196,14 @@ public class MyService extends Service implements
         handleNewLocation(location);
     }
 
-    private void sendToServer(){
-        MyDBHandler dbHandler = new MyDBHandler(this, null, null, DATABASE_VERSION);
-        ServerInteraction serverInteraction = new ServerInteraction(dbHandler);
-        String[] apps = null;//listOfRunningTasks();
-        serverInteraction.sendDataToServer(getUniqueIdentifier(),apps);
-    }
+//    private void sendToServer(){
+//        MyDBHandler dbHandler = new MyDBHandler(this, null, null, DATABASE_VERSION);
+//        ServerInteraction serverInteraction = new ServerInteraction(dbHandler);
+//        String[] apps = null;//listOfRunningTasks();
+//        serverInteraction.sendDataToServer(getUniqueIdentifier(),apps);
+//    }
 
-    /**
+    /*
      * Called when sensor values have changed.
      * <p>See {@link SensorManager SensorManager}
      * for details on possible sensor types.
@@ -246,37 +246,37 @@ public class MyService extends Service implements
 //        dbHandler.deleteLocations();
 //    }
 
-    class MyTask implements Runnable {
-        @Override
-        public void run() {
-            //mLocationRequest.setFastestInterval(300000);
-            sendToServer();
-            //delete data that has been send to the server
-            //deleteLocations();
-            //mLocationRequest.setFastestInterval(300000);
-        }
-    }
+//    class MyTask implements Runnable {
+//        @Override
+//        public void run() {
+//            //mLocationRequest.setFastestInterval(300000);
+//            sendToServer();
+//            //delete data that has been send to the server
+//            //deleteLocations();
+//            //mLocationRequest.setFastestInterval(300000);
+//        }
+//    }
 
-    public String[] listOfRunningTasks()
-    {
-        ActivityManager activityManager = (ActivityManager) this.getSystemService(Context.ACTIVITY_SERVICE);
-        List<ActivityManager.RunningAppProcessInfo> runningTaskInfo = activityManager.getRunningAppProcesses();//getRunningTasks(Integer.MAX_VALUE);
-        String[] apps = new String[runningTaskInfo.size()];
-        int i=0;
-        for (ActivityManager.RunningAppProcessInfo processInfo : runningTaskInfo) {
-            PackageManager packageManager = getPackageManager();
-            ApplicationInfo applicationInfo = null;
-            for (String activeProcess : processInfo.pkgList) {
-                try
-                {
-                    applicationInfo = packageManager.getApplicationInfo(activeProcess, 0);
-                }
-                catch (final PackageManager.NameNotFoundException e) {}
-                final String title = (String)((applicationInfo != null) ? packageManager.getApplicationLabel(applicationInfo) : "???");
-                apps[i] = title;
-                i++;
-            }
-        }
-        return apps;
-    }
+//    public String[] listOfRunningTasks()
+//    {
+//        ActivityManager activityManager = (ActivityManager) this.getSystemService(Context.ACTIVITY_SERVICE);
+//        List<ActivityManager.RunningAppProcessInfo> runningTaskInfo = activityManager.getRunningAppProcesses();//getRunningTasks(Integer.MAX_VALUE);
+//        String[] apps = new String[runningTaskInfo.size()];
+//        int i=0;
+//        for (ActivityManager.RunningAppProcessInfo processInfo : runningTaskInfo) {
+//            PackageManager packageManager = getPackageManager();
+//            ApplicationInfo applicationInfo = null;
+//            for (String activeProcess : processInfo.pkgList) {
+//                try
+//                {
+//                    applicationInfo = packageManager.getApplicationInfo(activeProcess, 0);
+//                }
+//                catch (final PackageManager.NameNotFoundException e) {}
+//                final String title = (String)((applicationInfo != null) ? packageManager.getApplicationLabel(applicationInfo) : "???");
+//                apps[i] = title;
+//                i++;
+//            }
+//        }
+//        return apps;
+//    }
 }
