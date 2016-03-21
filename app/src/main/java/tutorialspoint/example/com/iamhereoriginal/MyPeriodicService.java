@@ -3,6 +3,7 @@ package tutorialspoint.example.com.iamhereoriginal;
 import android.app.IntentService;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
@@ -11,7 +12,6 @@ import android.util.Log;
  */
 
 public class MyPeriodicService extends IntentService {
-    private int DATABASE_VERSION = 3;
     public MyPeriodicService() {
         super("MyPeriodicService");
     }
@@ -23,13 +23,25 @@ public class MyPeriodicService extends IntentService {
         Log.i("MyPeriodicService", "Service running");
     }
     private void sendToServer(){
-        MyDBHandler dbHandler = new MyDBHandler(this, null, null, DATABASE_VERSION);
+        MyDBHandler dbHandler = new MyDBHandler(this, null, null, 0);
         ServerInteraction serverInteraction = new ServerInteraction(dbHandler);
         String[] apps = null;//listOfRunningTasks();
-        serverInteraction.sendDataToServer(getUniqueIdentifier(), apps);
+//        EmailDBHandler emdb = new EmailDBHandler(this,null);
+//        String email = emdb.findEmail();
+        String email = loadEmail();
+        serverInteraction.sendDataToServer(getUniqueIdentifier(), apps, email);
     }
     public String getUniqueIdentifier() {
         TelephonyManager telephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
         return telephonyManager.getDeviceId();
+    }
+    public String loadEmail() {
+        SharedPreferences sp =
+                getSharedPreferences("MyPrefs",
+                        Context.MODE_PRIVATE);
+        String email = sp.getString("email", null);
+//        EmailDBHandler emailDB = new EmailDBHandler(this,null);
+//        String email = emailDB.findEmail();
+        return email;
     }
 }

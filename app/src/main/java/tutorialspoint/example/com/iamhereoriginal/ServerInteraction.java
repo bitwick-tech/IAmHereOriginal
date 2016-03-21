@@ -39,13 +39,12 @@ public class ServerInteraction {
         this.dbHandler = dbHandler;
     }
 
-    public String sendDataToServer(String deviceId, String[] apps) {
-        //MyDBHandler dbHandler = new MyDBHandler(this, null, null, 1);
+    public String sendDataToServer(String deviceId, String[] apps, String email) {
         this.deviceId = deviceId;
         ArrayList<MyLocation> locationList = dbHandler.findLocations(System.currentTimeMillis() / 1000L);
         dbHandler.deleteLocations();
-        if (locationList.size() > 0) {
-            JSONObject finalPostData = formatJsonFromList(locationList,apps);
+        if (locationList.size() > 0 && email != null) {
+            JSONObject finalPostData = formatJsonFromList(locationList,apps,email);
             if (finalPostData.length() > 0) {
                 //return SendJsonDataToServerFunction(String.valueOf(finalPostData));
                 new SendJsonDataToServer().execute(String.valueOf(finalPostData));
@@ -63,7 +62,7 @@ public class ServerInteraction {
         return localTime;
     }
 
-    private JSONObject formatJsonFromList(ArrayList<MyLocation> locationList,String[] apps) {
+    private JSONObject formatJsonFromList(ArrayList<MyLocation> locationList,String[] apps, String myEmail) {
         int size = locationList.size();
         if(size > 0) {
             MyLocation tmp;// = new MyLocation();
@@ -122,7 +121,7 @@ public class ServerInteraction {
                 if(timeZone!=null && !timeZone.isEmpty()){
                     resp.put("tz",timeZone);
                 }
-                String myEmail = MyService.email;
+                //String myEmail = MyService.email;
                 if(myEmail!=null && !myEmail.isEmpty()){
                     resp.put("email",myEmail);
                 }

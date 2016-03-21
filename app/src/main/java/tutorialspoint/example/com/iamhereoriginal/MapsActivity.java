@@ -86,7 +86,7 @@ public class MapsActivity extends FragmentActivity implements
                 return;
             }
             saveEmail(accountName);
-            MyService.email = accountName;
+            //MyService.email = accountName;
         }
     }
 
@@ -105,9 +105,9 @@ public class MapsActivity extends FragmentActivity implements
                     // TODO
                 }
             }
-            else{
-                MyService.email = email;
-            }
+//            else{
+//                MyService.email = email;
+//            }
             email = loadEmail();
             if(email != null && !email.isEmpty()) {
                 startService(new Intent(getBaseContext(), MyService.class));
@@ -144,6 +144,7 @@ public class MapsActivity extends FragmentActivity implements
     }
 
     private void saveEmail(String email) {
+        if(email == null || email.isEmpty())return;
         SharedPreferences sp =
                 getSharedPreferences("MyPrefs",
                         Context.MODE_PRIVATE);
@@ -151,13 +152,17 @@ public class MapsActivity extends FragmentActivity implements
         editor.clear();
         editor.putString("email", email);
         editor.commit();
+//        EmailDBHandler emailDB = new EmailDBHandler(this,null);
+//        emailDB.addEmail(email);
     }
 
-    private String loadEmail() {
+    public String loadEmail() {
         SharedPreferences sp =
                 getSharedPreferences("MyPrefs",
                         Context.MODE_PRIVATE);
         String email = sp.getString("email", null);
+//        EmailDBHandler emailDB = new EmailDBHandler(this,null);
+//        String email = emailDB.findEmail();
         return email;
     }
 }
