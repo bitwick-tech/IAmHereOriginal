@@ -24,7 +24,8 @@ public class MyPeriodicService extends IntentService {
     }
     private void sendToServer(){
         MyDBHandler dbHandler = new MyDBHandler(this, null, null, 0);
-        ServerInteraction serverInteraction = new ServerInteraction(dbHandler);
+        AccelerometerDBHandler accelerometerDBHandler = new AccelerometerDBHandler(this,null);
+        ServerInteraction serverInteraction = new ServerInteraction(dbHandler,accelerometerDBHandler);
         String[] apps = null;//listOfRunningTasks();
         String email = loadEmail();
         serverInteraction.sendDataToServer(getUniqueIdentifier(), apps, email);

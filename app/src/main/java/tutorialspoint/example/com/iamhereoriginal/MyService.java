@@ -25,6 +25,8 @@ import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 
+import java.math.BigDecimal;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -35,19 +37,20 @@ import java.util.concurrent.TimeUnit;
 public class MyService extends Service implements
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
-        LocationListener{//,
-        //SensorEventListener {
+        LocationListener,
+        SensorEventListener {
 
     private GoogleApiClient mGoogleApiClient;
     public static final String TAG = MapsActivity.class.getSimpleName();
     private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
     private LocationRequest mLocationRequest;
-    public static String email;
-    private int DATABASE_VERSION = 3;
     private static MyService instance = null;
-    static Location lastLocation = null;
-//    private SensorManager senSensorManager;
-//    private Sensor senAccelerometer;
+    private static Location lastLocation = null;
+    private static float[] lastAccReading = {0,0,0};
+    private SensorManager senSensorManager;
+    private Sensor senAccelerometer;
+    public static float[] gravity = {0,0,0};
+    private static final float NOISE= (float) 0.01;
 
     public static boolean isInstanceCreated() {
         return instance != null;
@@ -91,14 +94,16 @@ public class MyService extends Service implements
         // Create the LocationRequest object
         mLocationRequest = LocationRequest.create()
                 .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
-                .setInterval(1*1000)        // 30 seconds, in milliseconds
-                .setFastestInterval(1 * 1000); // 3 seconds, in milliseconds
+                .setInterval(120*1000)        // 30 seconds, in milliseconds
+                .setFastestInterval(30 * 1000); // 3 seconds, in milliseconds
+//                .setInterval(01*1000)        // 1 second, in milliseconds
+//                .setFastestInterval(01 * 1000); // 1 second, in milliseconds
 
         mGoogleApiClient.connect();
 
-//        senSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-//        senAccelerometer = senSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-//        senSensorManager.registerListener(this, senAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
+        senSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        senAccelerometer = senSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        senSensorManager.registerListener(this, senAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
         //List<Sensor> deviceSensors = senSensorManager.getSensorList(Sensor.TYPE_ALL);
 
 
@@ -183,8 +188,8 @@ public class MyService extends Service implements
         float currentBearing = location.getBearing();
         float currentAccuracy = location.getAccuracy();
 
-        if(lastLocation == null || location.distanceTo(lastLocation) > 0.0){
-            MyDBHandler dbHandler = new MyDBHandler(this, null, null, DATABASE_VERSION);
+        if(lastLocation == null || location.distanceTo(lastLocation) > 10.0){
+            MyDBHandler dbHandler = new MyDBHandler(this, null, null, 0);
             MyLocation myLocation = new MyLocation(currentLatitude, currentLongitude, currentAltitude,lastUpdateTime, currentSpeed,currentBearing,currentAccuracy);
             dbHandler.addLocation(myLocation);
             lastLocation = location;
@@ -217,29 +222,63 @@ public class MyService extends Service implements
      *
      * @param event the {@link SensorEvent SensorEvent}.
      */
-//    @Override
-//    public void onSensorChanged(SensorEvent sensorEvent) {
-//        Sensor mySensor = sensorEvent.sensor;
-//
-//        if (mySensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-//
-//        }
-//    }
-//
-//    /**
-//     * Called when the accuracy of the registered sensor has changed.
-//     * <p/>
-//     * <p>See the SENSOR_STATUS_* constants in
-//     * {@link SensorManager SensorManager} for details.
-//     *
-//     * @param sensor
-//     * @param accuracy The new accuracy of this sensor, one of
-//     *                 {@code SensorManager.SENSOR_STATUS_*}
-//     */
-//    @Override
-//    public void onAccuracyChanged(Sensor sensor, int accuracy) {
-//
-//    }
+    @Override
+    public void onSensorChanged(SensorEvent sensorEvent) {
+        Sensor mySensor = sensorEvent.sensor;
+
+        if (mySensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+            float mLastX = lastAccReading[0];
+            float mLastY = lastAccReading[1];
+            float mLastZ = lastAccReading[2];
+            float[] data = removeGravity(sensorEvent, 3);
+            data[0] = round(data[0],3);
+            data[1] = round(data[1],3);
+            data[2] = round(data[2],3);
+            float deltaX = Math.abs(mLastX - data[0]);
+            float deltaY = Math.abs(mLastY - data[1]);
+            float deltaZ = Math.abs(mLastZ - data[2]);
+            if (deltaX < NOISE) deltaX = (float)0.0;
+            if (deltaY < NOISE) deltaY = (float)0.0;
+            if (deltaZ < NOISE) deltaZ = (float)0.0;
+            if(Float.compare(deltaX,0) != 0  ||  Float.compare(deltaY,0) != 0  ||  Float.compare(deltaZ,0) != 0){
+
+                lastAccReading[0] = data[0];
+                lastAccReading[1] = data[1];
+                lastAccReading[2] = data[2];
+                MySensorEvent mySensorEvent = new MySensorEvent();
+                mySensorEvent.set_lat(data[0]);
+                mySensorEvent.set_long(data[1]);
+                mySensorEvent.set_alt(data[2]);
+                long timeInMillis = (new Date()).getTime();
+                        //+ (sensorEvent.timestamp - System.nanoTime()) / 1000000L;
+                mySensorEvent.set_timestamp(timeInMillis);
+                mySensorEvent.set_accuracy(sensorEvent.accuracy);
+                AccelerometerDBHandler dbHandler = new AccelerometerDBHandler(this,null);
+                dbHandler.addEvent(mySensorEvent);
+            }
+
+        }
+    }
+    public static float round(float d, int decimalPlace) {
+        BigDecimal bd = new BigDecimal(Float.toString(d));
+        bd = bd.setScale(decimalPlace, BigDecimal.ROUND_HALF_UP);
+        return bd.floatValue();
+    }
+
+    /**
+     * Called when the accuracy of the registered sensor has changed.
+     * <p/>
+     * <p>See the SENSOR_STATUS_* constants in
+     * {@link SensorManager SensorManager} for details.
+     *
+     * @param sensor
+     * @param accuracy The new accuracy of this sensor, one of
+     *                 {@code SensorManager.SENSOR_STATUS_*}
+     */
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+    }
 
 //    public void deleteLocations(){
 //        MyDBHandler dbHandler = new MyDBHandler(this, null, null, DATABASE_VERSION);
@@ -279,4 +318,22 @@ public class MyService extends Service implements
 //        }
 //        return apps;
 //    }
+
+    public static float[] removeGravity(SensorEvent event, int modes){
+        // alpha is calculated as t / (t + dT)
+        // with t, the low-pass filter's time-constant
+        // and dT, the event delivery rate
+
+        final float alpha = (float)0.8;
+        float[] linear_acceleration = new float[modes];
+
+        gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0];
+        gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1];
+        gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2];
+
+        linear_acceleration[0] = event.values[0] - gravity[0];
+        linear_acceleration[1] = event.values[1] - gravity[1];
+        linear_acceleration[2] = event.values[2] - gravity[2];
+        return linear_acceleration;
+    }
 }

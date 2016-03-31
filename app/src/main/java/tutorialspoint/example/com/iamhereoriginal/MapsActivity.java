@@ -75,7 +75,7 @@ public class MapsActivity extends FragmentActivity implements
 //        alarm.setInexactRepeating(AlarmManager.RTC_WAKEUP, firstMillis,
 //                AlarmManager.INTERVAL_HALF_HOUR, pIntent);
         alarm.setRepeating(AlarmManager.RTC_WAKEUP, firstMillis,//calendar.getTimeInMillis(),
-                1000 * 60 * 1, pIntent);
+                1000 * 60* 60* 1, pIntent);//1hour
     }
 
     @Override
@@ -108,7 +108,6 @@ public class MapsActivity extends FragmentActivity implements
                 }
             }
         }
-
         super.onResume();
     }
 

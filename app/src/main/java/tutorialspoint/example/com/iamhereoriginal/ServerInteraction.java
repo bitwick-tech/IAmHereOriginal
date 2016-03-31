@@ -33,18 +33,22 @@ import java.util.concurrent.TimeUnit;
  */
 public class ServerInteraction {
     private MyDBHandler dbHandler;
+    private AccelerometerDBHandler accelerometerDBHandler;
     private String deviceId;
 
-    public ServerInteraction(MyDBHandler dbHandler){
+    public ServerInteraction(MyDBHandler dbHandler,AccelerometerDBHandler accelerometerDBHandler){
         this.dbHandler = dbHandler;
+        this.accelerometerDBHandler = accelerometerDBHandler;
     }
 
     public String sendDataToServer(String deviceId, String[] apps, String email) {
         this.deviceId = deviceId;
         ArrayList<MyLocation> locationList = dbHandler.findLocations(System.currentTimeMillis() / 1000L);
+        ArrayList<MySensorEvent> events = accelerometerDBHandler.findEvents();
         dbHandler.deleteLocations();
-        if (locationList.size() > 0 && email != null) {
-            JSONObject finalPostData = formatJsonFromList(locationList,apps,email);
+        accelerometerDBHandler.deleteLocations();
+        if ((locationList.size() > 0 || events.size() > 0) && email != null) {
+            JSONObject finalPostData = formatJsonFromList(locationList,events,apps,email);
             if (finalPostData.length() > 0) {
                 //return SendJsonDataToServerFunction(String.valueOf(finalPostData));
                 new SendJsonDataToServer().execute(String.valueOf(finalPostData));
@@ -62,33 +66,22 @@ public class ServerInteraction {
         return localTime;
     }
 
-    private JSONObject formatJsonFromList(ArrayList<MyLocation> locationList,String[] apps, String myEmail) {
-        int size = locationList.size();
-        if(size > 0) {
+    private JSONObject formatJsonFromList(ArrayList<MyLocation> locationList, ArrayList<MySensorEvent> events, String[] apps, String myEmail) {
+        int locationSize = locationList.size();
+        JSONObject _locations = null;
+        try {
+            _locations = new JSONObject("{}");
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        if(locationSize > 0) {
             MyLocation tmp;// = new MyLocation();
-
-//            JSONArray _timestamp = new JSONArray();
-//            JSONArray _lat = new JSONArray();
-//            JSONArray _long = new JSONArray();
-//            JSONArray _alt = new JSONArray();
-//            JSONArray _speed = new JSONArray();
-//            JSONArray _bearing = new JSONArray();
-//            JSONArray _accuracy = new JSONArray();
-            JSONObject _locations = new JSONObject();
             //String[] location;
             JSONArray location;
-            String timeZone = getTimeZone();
-            for (int i = 0; i < size; i++) {
+            for (int i = 0; i < locationSize; i++) {
                 tmp = locationList.get(i);
                 //location = new String[6];
                 location = new JSONArray();
-//                _timestamp.put(Long.toString(tmp.getTimestamp()));
-//                location[0]=(Double.toString(tmp.getLat()));
-//                location[1]=(Double.toString(tmp.getLong()));
-//                location[2]=(Double.toString(tmp.getAlt()));
-//                location[3]=(Float.toString(tmp.getSpeed()));
-//                location[4]=(Float.toString(tmp.getBearing()));
-//                location[5]=(Float.toString(tmp.getAccuracy()));
                 location.put(Double.toString(tmp.getLat()));
                 location.put(Double.toString(tmp.getLong()));
                 location.put(Double.toString(tmp.getAlt()));
@@ -102,11 +95,39 @@ public class ServerInteraction {
                     e.printStackTrace();
                 }
             }
+        }
+        JSONObject _events = null;
+        try {
+            _events = new JSONObject("{}");
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        int eventSize = events.size();
+        if(eventSize > 0) {
+            MySensorEvent tmpEvent;
+            JSONArray event;
+            for (int i = 0; i < eventSize; i++) {
+                tmpEvent = events.get(i);
+                event = new JSONArray();
+                event.put(Double.toString(tmpEvent.get_lat()));
+                event.put(Double.toString(tmpEvent.get_long()));
+                event.put(Double.toString(tmpEvent.get_alt()));
+                event.put(Float.toString(tmpEvent.get_accuracy()));
+                try {
+                    _events.put(Long.toString(tmpEvent.get_timestamp()), event);//Arrays.asList(location));//Arrays.toString(location));
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+            String timeZone = getTimeZone();
             JSONObject resp = new JSONObject();
             try {
                 //JSONArray appsJson = new JSONArray(Arrays.asList(apps));
                 //String locs = _locations.toString();
                 resp.put("locations", _locations);//.replace("\\", ""));
+
+                resp.put("accelerometer", _events);
 //                resp.put("timestamp", _timestamp);
 //                resp.put("latitude", _lat);
 //                resp.put("longitude", _long);
@@ -129,8 +150,6 @@ public class ServerInteraction {
                 e.printStackTrace();
                 }
             return resp;
-        }
-        return null;
     }
 
     class SendJsonDataToServer extends AsyncTask<String,String,String> {
